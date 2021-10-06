@@ -286,11 +286,11 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
             if(wait){
                 time_to_regain <- as.numeric(jsonlite::fromJSON(headers$`x-business-use-case-usage`)[[1]]$estimated_time_to_regain_access)
                 
+                print(paste0("TIME TO REGAIN ACCESS: ", time_to_regain*61))
                 
+                print(paste0("WAIT TIME UNTIL: ", as.character(Sys.time() + time_to_regain*61)))
                 
-                print("Will have to wait until to continue: ", Sys.time() + time_to_regain)
-                
-                Sys.sleep(time_to_regain)
+                Sys.sleep(time_to_regain*61)
                 
                 print("And we are live again!")               
             }
