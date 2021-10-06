@@ -115,9 +115,9 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
         paste0('v', version),
         path, sep = '/')
     
-    no_response <- T
-    
-    while(no_response){
+    # no_response <- T
+
+    # while(no_response){
         
         ## query
         if (method == 'DELETE') {
@@ -167,7 +167,7 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
                 error = function(e) e)
         }
         
-        print("1")
+        # print("1")
         
         ## remove token from params if printed for debugging purposes
         # params$token <- params$access_token <- NULL
@@ -204,7 +204,7 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
         }
         
         
-        print("2")
+        # print("2")
         
         ## Response error handling
         if (inherits(res, 'error')) {
@@ -224,7 +224,7 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
         }
         
         
-        print("3")
+        # print("3")
         
         ## Capture return value
         res     <- b$value()
@@ -234,7 +234,7 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
         if (headers$status != '200') {
             
             
-            print("4")
+            # print("4")
             
             ## log details of the error
             if (log) {
@@ -309,7 +309,7 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
 
             
 
-        }
+        # }
         
         no_response <- F
         
