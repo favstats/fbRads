@@ -167,6 +167,8 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
                 error = function(e) e)
         }
         
+        print("1")
+        
         ## remove token from params if printed for debugging purposes
         # params$token <- params$access_token <- NULL
         
@@ -201,6 +203,9 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
             
         }
         
+        
+        print("2")
+        
         ## Response error handling
         if (inherits(res, 'error')) {
             
@@ -218,12 +223,18 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
             
         }
         
+        
+        print("3")
+        
         ## Capture return value
         res     <- b$value()
         headers <- as.list(h$value())
         
         ## Response code error handling
         if (headers$status != '200') {
+            
+            
+            print("4")
             
             ## log details of the error
             if (log) {
