@@ -105,181 +105,199 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
     if (debug) {
         print(params)
     }
-
+    
     ## remove prefix from the path if already provided
     path <- sub(paste0('^https://graph.facebook.com/v', version, '/'), '', path)
-
+    
     ## versioned API endpoint
     API_endpoint <- paste(
         'https://graph.facebook.com',
         paste0('v', version),
         path, sep = '/')
-
-    ## query
-    if (method == 'DELETE') {
-
-        curlres <- tryCatch(res <- getURLContent(
-                                url   = paste0(API_endpoint, '?',
-                                               paste(mapply(function(id, v)
-                                                            paste(URLencode(id),
-                                                                  URLencode(v),
-                                                                  sep = '='),
-                                                            names(params),
-                                                            params),
-                                                     collapse = '&')),
-                                .opts = curlOptions(
-                                    headerfunction = h$update,
-                                    verbose   = debug,
-                                    writefunc = b$update,
-                                    customrequest = 'DELETE',
-                                    cainfo    = system.file(
-                                        'CurlSSL',
-                                        'cacert.pem',
-                                        package = 'RCurl'),
-                                    connecttimeout = 3,
-                                    timeout = 300)),
-                            error = function(e) e)
-
-    } else {
-
-        curlres <- tryCatch(res <- do.call(what = paste0(
-                                               ifelse(method == 'GET', 'get', 'post'),
-                                               'Form'),
-                                           args = list(
-                                               uri     = API_endpoint,
-                                               .params = params,
-                                               .opts = curlOptions(
-                                                   headerfunction = h$update,
-                                                   verbose   = debug,
-                                                   writefunc = b$update,
-                                                   cainfo    = system.file(
-                                                       'CurlSSL',
-                                                       'cacert.pem',
-                                                       package = 'RCurl'),
-                                                   crlf = ifelse(method == 'GET',
-                                                                 TRUE, FALSE),
-                                                   connecttimeout = 3,
-                                                   timeout = 300))),
-                            error = function(e) e)
-    }
-
-    ## remove token from params if printed for debugging purposes
-    params$token <- params$access_token <- NULL
-
-    ## Curl error handling
-    if (inherits(curlres, 'error')) {
-
-        ## temporary network issue?
-        if (grepl('Network is unreachable', curlres$message) |
-            grepl('Empty reply from server', curlres$message) |
-            grepl('Failed to connect to graph.facebook.com', curlres$message) |
-            grepl('(Connection|Operation|Resolving) timed out after', curlres$message) |
-            grepl('Unknown SSL protocol error', curlres$message) |
-            grepl('OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to graph.facebook.com', curlres$message) |
-            grepl('OpenSSL SSL_read: SSL_ERROR_SYSCALL', curlres$message)) {
-
-            ## log it
-            flog.error(paste('Possible network error:', curlres$message), name = 'fbRads')
-            flog.info(paste('Retrying query for the', retries + 1, ' st/nd/rd time'), name = 'fbRads')
-
-            ## give some chance for the system/network to recover
-            Sys.sleep(2)
-
-            ## retry the query for no more than 3 times
-            if (retries < 3) {
-                mc$retries <- retries + 1
-                return(eval(mc, envir = parent.frame()))
-            }
-
+    
+    no_response <- T
+    
+    while(no_response){
+        
+        ## query
+        if (method == 'DELETE') {
+            
+            curlres <- tryCatch(res <- getURLContent(
+                url   = paste0(API_endpoint, '?',
+                               paste(mapply(function(id, v)
+                                   paste(URLencode(id),
+                                         URLencode(v),
+                                         sep = '='),
+                                   names(params),
+                                   params),
+                                   collapse = '&')),
+                .opts = curlOptions(
+                    headerfunction = h$update,
+                    verbose   = debug,
+                    writefunc = b$update,
+                    customrequest = 'DELETE',
+                    cainfo    = system.file(
+                        'CurlSSL',
+                        'cacert.pem',
+                        package = 'RCurl'),
+                    connecttimeout = 3,
+                    timeout = 300)),
+                error = function(e) e)
+            
+        } else {
+            
+            curlres <- tryCatch(res <- do.call(what = paste0(
+                ifelse(method == 'GET', 'get', 'post'),
+                'Form'),
+                args = list(
+                    uri     = API_endpoint,
+                    .params = params,
+                    .opts = curlOptions(
+                        headerfunction = h$update,
+                        verbose   = debug,
+                        writefunc = b$update,
+                        cainfo    = system.file(
+                            'CurlSSL',
+                            'cacert.pem',
+                            package = 'RCurl'),
+                        crlf = ifelse(method == 'GET',
+                                      TRUE, FALSE),
+                        connecttimeout = 3,
+                        timeout = 300))),
+                error = function(e) e)
         }
-
-        res <- curlres
-
-    }
-
-    ## Response error handling
-    if (inherits(res, 'error')) {
-
-         if (log) {
-            flog.error(paste('URL: ', API_endpoint), name = 'fbRads')
-            flog.error(paste('Method: ', method), name = 'fbRads')
-            flog.error(paste('Params: ', paste(capture.output(str(params)), collapse = '\n')), name = 'fbRads')
-        }
-
-        stop(paste(
-            ifelse(inherits(curlres, 'error'),
-                   'This is a bug in the fbRads package. Please report on GitHub with a detailed output:',
-                   'FB query failed:'),
-            res$message))
-
-    }
-
-    ## Capture return value
-    res     <- b$value()
-    headers <- as.list(h$value())
-
-    ## Response code error handling
-    if (headers$status != '200') {
-
-        ## log details of the error
-        if (log) {
-            flog.error(paste('URL: ', API_endpoint), name = 'fbRads')
-            flog.error(paste('Method: ', method), name = 'fbRads')
-            flog.error(paste('Params: ', paste(capture.output(str(params)), collapse = '\n')), name = 'fbRads')
-            flog.error(paste('Header:', toJSON(headers)), name = 'fbRads')
-            flog.error(paste('Body:', res), name = 'fbRads')
-        }
-
-        ## retry if Service (temporarily) Unavailable
-        if (headers$status %in% c('502', '503', '504')) {
-
-            ## give some chance for the system/network to recover
-            Sys.sleep(2)
-
-            ## retry the query for no more than 3 times
-            if (retries < 3) {
+        
+        ## remove token from params if printed for debugging purposes
+        # params$token <- params$access_token <- NULL
+        
+        ## Curl error handling
+        if (inherits(curlres, 'error')) {
+            
+            ## temporary network issue?
+            if (grepl('Network is unreachable', curlres$message) |
+                grepl('Empty reply from server', curlres$message) |
+                grepl('Failed to connect to graph.facebook.com', curlres$message) |
+                grepl('(Connection|Operation|Resolving) timed out after', curlres$message) |
+                grepl('Unknown SSL protocol error', curlres$message) |
+                grepl('OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to graph.facebook.com', curlres$message) |
+                grepl('OpenSSL SSL_read: SSL_ERROR_SYSCALL', curlres$message)) {
+                
+                ## log it
+                flog.error(paste('Possible network error:', curlres$message), name = 'fbRads')
                 flog.info(paste('Retrying query for the', retries + 1, ' st/nd/rd time'), name = 'fbRads')
-                mc$retries <- retries + 1
-                return(eval(mc, envir = parent.frame()))
+                
+                ## give some chance for the system/network to recover
+                Sys.sleep(2)
+                
+                ## retry the query for no more than 3 times
+                if (retries < 3) {
+                    mc$retries <- retries + 1
+                    return(eval(mc, envir = parent.frame()))
+                }
+                
             }
-
+            
+            res <- curlres
+            
         }
-
-        ## something nasty happened that we cannot help (yet)
-        if (inherits(tryCatch(fromJSONish(res), error = function(e) e), 'error') ||
-            is.null(fromJSONish(res))) {
-            stop('Some critical FB query error here.')
-        }
-
-        ## otherwise it's a JSON response
-        res <- fromJSONish(res)
-
-        ## temporary "API Unknown" (1) or "API Service" (2) error at FB
-        if (res$error$code %in% 1:2) {
-
-            ## log it
-            flog.error(paste('This is a temporary',
-                             shQuote(res$error$type),
-                             'FB error:',
-                             res$error$message),
-                       name = 'fbRads')
-
-            ## give some chance for the system/network to recover
-            Sys.sleep(2)
-
-            ## retry the query for no more than 3 times
-            if (retries < 3) {
-                flog.info(paste('Retrying query for the', retries + 1, ' st/nd/rd time'), name = 'fbRads')
-                mc$retries <- retries + 1
-                return(eval(mc, envir = parent.frame()))
+        
+        ## Response error handling
+        if (inherits(res, 'error')) {
+            
+            if (log) {
+                flog.error(paste('URL: ', API_endpoint), name = 'fbRads')
+                flog.error(paste('Method: ', method), name = 'fbRads')
+                flog.error(paste('Params: ', paste(capture.output(str(params)), collapse = '\n')), name = 'fbRads')
             }
+            
+            stop(paste(
+                ifelse(inherits(curlres, 'error'),
+                       'This is a bug in the fbRads package. Please report on GitHub with a detailed output:',
+                       'FB query failed:'),
+                res$message))
+            
+        }
+        
+        ## Capture return value
+        res     <- b$value()
+        headers <- as.list(h$value())
+        
+        ## Response code error handling
+        if (headers$status != '200') {
+            
+            ## log details of the error
+            if (log) {
+                flog.error(paste('URL: ', API_endpoint), name = 'fbRads')
+                flog.error(paste('Method: ', method), name = 'fbRads')
+                flog.error(paste('Params: ', paste(capture.output(str(params)), collapse = '\n')), name = 'fbRads')
+                flog.error(paste('Header:', toJSON(headers)), name = 'fbRads')
+                flog.error(paste('Body:', res), name = 'fbRads')
+            }
+            
+            ## retry if Service (temporarily) Unavailable
+            if (headers$status %in% c('502', '503', '504')) {
+                
+                ## give some chance for the system/network to recover
+                Sys.sleep(2)
+                
+                ## retry the query for no more than 3 times
+                if (retries < 3) {
+                    flog.info(paste('Retrying query for the', retries + 1, ' st/nd/rd time'), name = 'fbRads')
+                    mc$retries <- retries + 1
+                    return(eval(mc, envir = parent.frame()))
+                }
+                
+            }
+            
+            ## something nasty happened that we cannot help (yet)
+            if (inherits(tryCatch(fromJSONish(res), error = function(e) e), 'error') ||
+                is.null(fromJSONish(res))) {
+                stop('Some critical FB query error here.')
+            }
+            
+            ## otherwise it's a JSON response
+            res <- fromJSONish(res)
+            
+            ## temporary "API Unknown" (1) or "API Service" (2) error at FB
+            if (res$error$code %in% 1:2) {
+                
+                ## log it
+                flog.error(paste('This is a temporary',
+                                 shQuote(res$error$type),
+                                 'FB error:',
+                                 res$error$message),
+                           name = 'fbRads')
+                
+                ## give some chance for the system/network to recover
+                Sys.sleep(2)
+                
+                ## retry the query for no more than 3 times
+                if (retries < 3) {
+                    flog.info(paste('Retrying query for the', retries + 1, ' st/nd/rd time'), name = 'fbRads')
+                    mc$retries <- retries + 1
+                    return(eval(mc, envir = parent.frame()))
+                }
+                
+            }
+            
+            time_to_regain <- as.numeric(jsonlite::fromJSON(headers$`x-business-use-case-usage`)[[1]]$estimated_time_to_regain_access)
+            
+            ## fail with (hopefully) meaningful error message
+            message(res$error$message)
+            
+            print("Will have to wait until to continue: ", Sys.time() + time_to_regain)
+            
+            Sys.sleep(time_to_regain)
+            
+            print("And we are live again!")
+            
 
         }
-
-        ## fail with (hopefully) meaningful error message
-        stop(res$error$message)
-
+        
+        no_response <- F
+        
     }
+
 
     ## return
     res
