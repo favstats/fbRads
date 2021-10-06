@@ -65,7 +65,7 @@ fbad_check_curl_params <- function(params) {
 #' @return json object containing results
 #' @keywords internal
 #' @importFrom utils getFromNamespace URLencode capture.output str
-fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), params = list(), debug = FALSE, log = TRUE, version, retries = 0) {
+fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), params = list(), debug = FALSE, log = TRUE, version, retries = 0, wait = F) {
 
     mc     <- match.call()
     method <- match.arg(method)
@@ -280,16 +280,22 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
                 
             }
             
-            time_to_regain <- as.numeric(jsonlite::fromJSON(headers$`x-business-use-case-usage`)[[1]]$estimated_time_to_regain_access)
-            
             ## fail with (hopefully) meaningful error message
             message(res$error$message)
             
-            print("Will have to wait until to continue: ", Sys.time() + time_to_regain)
+            if(wait){
+                time_to_regain <- as.numeric(jsonlite::fromJSON(headers$`x-business-use-case-usage`)[[1]]$estimated_time_to_regain_access)
+                
+                
+                
+                print("Will have to wait until to continue: ", Sys.time() + time_to_regain)
+                
+                Sys.sleep(time_to_regain)
+                
+                print("And we are live again!")               
+            }
             
-            Sys.sleep(time_to_regain)
-            
-            print("And we are live again!")
+
             
 
         }
