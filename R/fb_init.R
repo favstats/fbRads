@@ -267,16 +267,16 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
             }
             
             ## otherwise it's a JSON response
-            res <- fromJSONish(res)
+            something_else <- fromJSONish(res)
             
             ## temporary "API Unknown" (1) or "API Service" (2) error at FB
-            if (res$error$code %in% 1:2) {
+            if (something_else$error$code %in% 1:2) {
                 
                 ## log it
                 flog.error(paste('This is a temporary',
-                                 shQuote(res$error$type),
+                                 shQuote(something_else$error$type),
                                  'FB error:',
-                                 res$error$message),
+                                 something_else$error$message),
                            name = 'fbRads')
                 
                 ## give some chance for the system/network to recover
@@ -292,7 +292,7 @@ fbad_request <- function(fbacc, path, method = c('GET', 'POST', 'DELETE'), param
             }
             
             ## fail with (hopefully) meaningful error message
-            message(res$error$message)
+            message(something_else$error$message)
             
             if(wait){
                 time_to_regain <- as.numeric(jsonlite::fromJSON(headers$`x-business-use-case-usage`)[[1]]$estimated_time_to_regain_access)
